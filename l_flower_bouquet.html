@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASCII Flower Bouquet – L Collection</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@500;700&family=Cormorant+Garamond:ital,wght@0,400;1,400&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; font-family: 'Cormorant Garamond', Georgia, serif; }
+  canvas {
+    display: block;
+    filter: drop-shadow(0 0 18px rgba(255,100,170,0.25))
+            drop-shadow(0 0 60px rgba(255,60,140,0.12));
+  }
+  #title {
+    position: fixed; top: 16px; left: 0; right: 0; text-align: center;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(13px, 2.6vw, 34px);
+    color: #fff; letter-spacing: 2px; opacity: 0.92;
+    text-shadow: 0 0 20px rgba(255,100,180,0.7), 0 0 40px rgba(255,50,120,0.4);
+    pointer-events: none; z-index: 10;
+    transition: opacity 0.6s;
+  }
+  #hint {
+    position: fixed; bottom: 10px; left: 0; right: 0; text-align: center;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    color: rgba(255,255,255,0.3); pointer-events: none; z-index: 10;
+    transition: opacity 0.6s;
+  }
+
+  /* ===== QUIZ OVERLAY ===== */
+  #quiz-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 60%, rgba(40,0,30,0.85) 0%, rgba(0,0,0,0.92) 100%);
+    backdrop-filter: blur(6px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.7s ease;
+  }
+  #quiz-overlay.show { opacity: 1; pointer-events: auto; }
+
+  .quiz-question {
+    font-family: 'Dancing Script', cursive;
+    font-size: clamp(22px, 5vw, 46px);
+    color: #FFD0E8;
+    text-shadow: 0 0 24px rgba(255,100,170,0.6), 0 0 60px rgba(255,50,120,0.3);
+    margin-bottom: 32px;
+    text-align: center;
+    animation: floatIn 0.8s ease-out;
+  }
+
+  .flower-grid {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 14px; max-width: 650px; padding: 0 16px;
+  }
+
+  .flower-btn {
+    background: linear-gradient(135deg, rgba(255,80,150,0.15) 0%, rgba(180,40,120,0.2) 100%);
+    border: 1.5px solid rgba(255,140,190,0.35);
+    border-radius: 28px;
+    padding: 12px 26px;
+    color: #FFD6EC;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(14px, 2.5vw, 20px);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.35s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .flower-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255,100,170,0.25) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.35s;
+  }
+  .flower-btn:hover {
+    background: linear-gradient(135deg, rgba(255,100,170,0.35) 0%, rgba(220,50,140,0.35) 100%);
+    border-color: rgba(255,180,210,0.7);
+    transform: scale(1.07);
+    box-shadow: 0 0 24px rgba(255,100,170,0.35);
+  }
+  .flower-btn:hover::before { opacity: 1; }
+
+  .flower-btn.wrong {
+    animation: shake 0.5s ease;
+    border-color: rgba(255,80,80,0.6) !important;
+    background: linear-gradient(135deg, rgba(255,50,50,0.2) 0%, rgba(180,30,30,0.2) 100%) !important;
+  }
+  .flower-btn.correct {
+    border-color: rgba(100,255,160,0.8) !important;
+    background: linear-gradient(135deg, rgba(60,255,130,0.3) 0%, rgba(40,200,100,0.25) 100%) !important;
+    box-shadow: 0 0 30px rgba(100,255,160,0.4);
+    transform: scale(1.12);
+  }
+
+  /* ===== WRONG ANSWER → TEXT INPUT ===== */
+  #wrong-panel {
+    display: none; flex-direction: column; align-items: center;
+    animation: floatIn 0.6s ease-out;
+  }
+  #wrong-panel.show { display: flex; }
+
+  .wrong-msg {
+    font-family: 'Dancing Script', cursive;
+    font-size: clamp(18px, 4vw, 34px);
+    color: #FFB0C8;
+    text-shadow: 0 0 18px rgba(255,100,170,0.5);
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .wrong-sub {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(13px, 2.2vw, 18px);
+    color: rgba(255,200,220,0.65);
+    margin-bottom: 24px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  #flower-input {
+    background: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,140,190,0.4);
+    border-radius: 24px;
+    padding: 14px 28px;
+    color: #FFE0EE;
+    font-family: 'Dancing Script', cursive;
+    font-size: clamp(18px, 3vw, 26px);
+    text-align: center;
+    width: min(380px, 80vw);
+    outline: none;
+    transition: border-color 0.4s, box-shadow 0.4s;
+  }
+  #flower-input::placeholder {
+    color: rgba(255,180,210,0.35);
+  }
+  #flower-input:focus {
+    border-color: rgba(255,180,220,0.7);
+    box-shadow: 0 0 28px rgba(255,100,170,0.3);
+  }
+
+  #submit-btn {
+    margin-top: 20px;
+    background: linear-gradient(135deg, rgba(255,100,170,0.35) 0%, rgba(220,50,140,0.3) 100%);
+    border: 1.5px solid rgba(255,160,200,0.5);
+    border-radius: 28px;
+    padding: 12px 40px;
+    color: #FFD6EC;
+    font-family: 'Dancing Script', cursive;
+    font-size: clamp(16px, 2.8vw, 24px);
+    cursor: pointer;
+    transition: all 0.35s;
+  }
+  #submit-btn:hover {
+    background: linear-gradient(135deg, rgba(255,130,190,0.5) 0%, rgba(240,70,160,0.4) 100%);
+    transform: scale(1.06);
+    box-shadow: 0 0 26px rgba(255,100,170,0.35);
+  }
+
+  /* ===== FIREWORKS CANVAS ===== */
+  #fireworks-canvas {
+    position: fixed; inset: 0; z-index: 200;
+    pointer-events: none; opacity: 0;
+    transition: opacity 0.5s;
+  }
+  #fireworks-canvas.show { opacity: 1; pointer-events: auto; }
+
+  #fireworks-msg {
+    position: fixed; z-index: 250;
+    left: 0; right: 0; top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    font-family: 'Dancing Script', cursive;
+    font-size: clamp(28px, 6vw, 60px);
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255,100,170,0.8), 0 0 60px rgba(255,50,130,0.5),
+                 0 0 90px rgba(255,180,220,0.3);
+    opacity: 0; pointer-events: none;
+    transition: opacity 1s;
+  }
+  #fireworks-msg.show { opacity: 1; }
+
+  /* ===== ANIMATIONS ===== */
+  @keyframes floatIn {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-10px) rotate(-2deg); }
+    30% { transform: translateX(8px) rotate(1.5deg); }
+    45% { transform: translateX(-6px) rotate(-1deg); }
+    60% { transform: translateX(4px) rotate(0.5deg); }
+    75% { transform: translateX(-2px); }
+  }
+</style>
+</head>
+<body>
+<div id="title">Who needs flowers when you can code them?</div>
+<div id="hint">✿ Click any flower to begin ✿</div>
+<canvas id="vis"></canvas>
+
+<!-- QUIZ OVERLAY -->
+<div id="quiz-overlay">
+  <div id="quiz-content">
+    <div class="quiz-question">Can you guess her favorite flower? 🌸</div>
+    <div class="flower-grid" id="flower-grid"></div>
+  </div>
+  <div id="wrong-panel">
+    <div class="wrong-msg">Not quite… 🥀</div>
+    <div class="wrong-sub">But that's okay — tell her what flower reminds you of her</div>
+    <input type="text" id="flower-input" placeholder="Type a flower name…" autocomplete="off" spellcheck="false">
+    <button id="submit-btn">Send with love 💌</button>
+  </div>
+</div>
+
+<!-- FIREWORKS -->
+<canvas id="fireworks-canvas"></canvas>
+<div id="fireworks-msg"></div>
+
+<script>
+// ============================================================
+//  ASCII Flower Bouquet – "L" Collection
+//  Procedural, single-file, no dependencies
+// ============================================================
+
+const vis = document.getElementById('vis');
+const ctx = vis.getContext('2d');
+
+// ---- Seeded PRNG (xoshiro128**) ----
+let _s = new Uint32Array(4);
+function seedRNG(n) {
+  n = n >>> 0;
+  for (let i = 0; i < 4; i++) { n = (n * 1664525 + 1013904223) >>> 0; _s[i] = n; }
+}
+function rand() {
+  const r = Math.imul(_s[0], 5) << 7 | Math.imul(_s[0], 5) >>> 25;
+  const t = _s[1] << 9;
+  _s[2] ^= _s[0]; _s[3] ^= _s[1]; _s[1] ^= _s[2]; _s[0] ^= _s[3];
+  _s[2] ^= t; _s[3] = _s[3] << 11 | _s[3] >>> 21;
+  return (r * Math.imul(9, 1) >>> 0) / 4294967296;
+}
+function rr(a, b) { return a + rand() * (b - a); }
+function ri(a, b) { return Math.floor(rr(a, b + 1)); }
+
+// ---- Color helpers ----
+function hsl(h,s,l) { return `hsl(${h},${s}%,${l}%)`; }
+function hsla(h,s,l,a) { return `hsla(${h},${s}%,${l}%,${a})`; }
+
+// ---- State ----
+let currentSeed = Date.now();
+let W, H;
+const offC = document.createElement('canvas');
+const offCtx = offC.getContext('2d');
+let offW, offH;
+const CHAR_RAMP = ' .:-=+*#%@';
+
+function cellW() { return W < 500 ? 5 : 7; }
+function cellH() { return W < 500 ? 9 : 12; }
+
+// ============================================================
+//  DRAWING PRIMITIVES
+// ============================================================
+
+function petal(c, cx, cy, len, angle, width, curve, fill, outline) {
+  c.save(); c.translate(cx, cy); c.rotate(angle);
+  c.beginPath(); c.moveTo(0, 0);
+  c.bezierCurveTo(width*len, -curve*len, width*len, -(1-curve)*len, 0, -len);
+  c.bezierCurveTo(-width*len, -(1-curve)*len, -width*len, -curve*len, 0, 0);
+  c.closePath();
+  c.fillStyle = fill; c.fill();
+  if (outline) { c.strokeStyle = outline; c.lineWidth = 1.2; c.stroke(); }
+  c.restore();
+}
+
+function pointedPetal(c, cx, cy, len, angle, width, fill, outline) {
+  c.save(); c.translate(cx, cy); c.rotate(angle);
+  c.beginPath(); c.moveTo(0, 0);
+  c.bezierCurveTo(width*len*1.1, -len*0.25, width*len*0.7, -len*0.75, 0, -len);
+  c.bezierCurveTo(-width*len*0.7, -len*0.75, -width*len*1.1, -len*0.25, 0, 0);
+  c.closePath();
+  c.fillStyle = fill; c.fill();
+  if (outline) { c.strokeStyle = outline; c.lineWidth = 1.2; c.stroke(); }
+  c.restore();
+}
+
+// ============================================================
+//  FLOWER DRAWING FUNCTIONS (8 types)
+// ============================================================
+
+function drawLily(c, cx, cy, r, palette) {
+  const pal = palette || 0;
+  const hues   = [345, 350, 42,  25 ];
+  const sats   = [80,  60,  50,  55 ];
+  const lights = [55,  72,  82,  70 ];
+  const h = hues[pal % hues.length];
+  const s = sats[pal % sats.length];
+  const l = lights[pal % lights.length];
+  for (let layer = 0; layer < 2; layer++) {
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + layer * (Math.PI / 3) + rr(-0.08, 0.08);
+      const pLen = r * rr(0.85, 1.05);
+      pointedPetal(c, cx, cy, pLen, a, 0.22,
+        hsl(h + rr(-5,5), s + rr(-5,5), l + rr(-3,3)),
+        'rgba(80,20,40,0.5)');
+      pointedPetal(c, cx, cy, pLen * 0.85, a, 0.06,
+        hsla(h - 10, s + 15, l - 18, 0.55), null);
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + rr(-0.1, 0.1);
+    const sLen = r * rr(0.55, 0.7);
+    const ex = cx + Math.cos(a - Math.PI/2) * sLen;
+    const ey = cy + Math.sin(a - Math.PI/2) * sLen;
+    c.strokeStyle = hsl(45, 60, 45); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx, cy); c.lineTo(ex, ey); c.stroke();
+    c.fillStyle = hsl(25, 70, 40);
+    c.beginPath(); c.arc(ex, ey, 2, 0, Math.PI * 2); c.fill();
+  }
+}
+
+function drawLilac(c, cx, cy, r) {
+  const coneH = r * 1.6;
+  const rows = 10;
+  for (let row = 0; row < rows; row++) {
+    const t = row / rows;
+    const y0 = cy - coneH * 0.5 + t * coneH;
+    const rowW = r * 0.6 * (1 - t * 0.7);
+    const n = Math.max(2, Math.floor(6 * (1 - t * 0.5)));
+    for (let i = 0; i < n; i++) {
+      const fx = cx + rr(-rowW, rowW);
+      const fy = y0 + rr(-3, 3);
+      const sr = rr(2.5, 4.5);
+      const fh = rr(280, 335);
+      for (let p = 0; p < 4; p++) {
+        petal(c, fx, fy, sr, (p / 4) * Math.PI * 2 + rr(0, 0.3), 0.35, 0.4,
+          hsl(fh, 55 + rr(0,20), 65 + rr(0,15)), 'rgba(60,20,60,0.3)');
+      }
+      c.fillStyle = '#FFE'; c.beginPath(); c.arc(fx, fy, 1, 0, Math.PI*2); c.fill();
+    }
+  }
+}
+
+function drawLotus(c, cx, cy, r) {
+  for (let layer = 2; layer >= 0; layer--) {
+    const n = 6 + layer * 2;
+    const lr = r * (0.5 + layer * 0.22);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + layer * 0.2 + rr(-0.08, 0.08);
+      const grd = c.createLinearGradient(
+        cx, cy, cx + Math.cos(a - Math.PI/2) * lr, cy + Math.sin(a - Math.PI/2) * lr);
+      grd.addColorStop(0,   '#FFF5F0');
+      grd.addColorStop(0.5, '#FFB0C8');
+      grd.addColorStop(1,   hsl(340 - layer*5, 75, 55));
+      pointedPetal(c, cx, cy, lr * rr(0.9, 1.1), a, 0.2,
+        grd, 'rgba(120,30,60,0.35)');
+    }
+  }
+  c.fillStyle = '#D4C040';
+  c.beginPath(); c.arc(cx, cy, r * 0.14, 0, Math.PI*2); c.fill();
+  c.strokeStyle = 'rgba(100,80,20,0.5)'; c.lineWidth = 0.8; c.stroke();
+  for (let i = 0; i < 6; i++) {
+    const a = rr(0, Math.PI*2), d = rr(1, r*0.1);
+    c.fillStyle = '#8B7520';
+    c.beginPath(); c.arc(cx+Math.cos(a)*d, cy+Math.sin(a)*d, 1.2, 0, Math.PI*2); c.fill();
+  }
+}
+
+function drawLantana(c, cx, cy, r) {
+  const count = 35 + ri(0, 15);
+  for (let i = 0; i < count; i++) {
+    const a = rr(0, Math.PI * 2);
+    const d = rr(0, r * 0.65);
+    const fx = cx + Math.cos(a) * d;
+    const fy = cy + Math.sin(a) * d * 0.7;
+    const t = d / (r * 0.65);
+    const sr = rr(2, 4);
+    for (let p = 0; p < 4; p++) {
+      petal(c, fx, fy, sr, (p/4)*Math.PI*2+rr(0,0.4), 0.4, 0.4,
+        hsl((340 + t * 80) % 360, 80, 60 + rr(0,10)), 'rgba(80,30,10,0.25)');
+    }
+  }
+}
+
+function drawLupine(c, cx, cy, r) {
+  const spikeH = r * 2.2;
+  const rows = 14;
+  for (let row = 0; row < rows; row++) {
+    const t = row / rows;
+    const y0 = cy + spikeH * 0.4 - t * spikeH;
+    const rowW = r * 0.35 * (1 - t * 0.6);
+    const n = Math.max(1, Math.floor(4 * (1 - t * 0.5)));
+    for (let i = 0; i < n; i++) {
+      const fx = cx + rr(-rowW, rowW);
+      const fy = y0 + rr(-2, 2);
+      const sr = rr(3, 5) * (1 - t * 0.3);
+      const fh = 290 + t * 50 + rr(-10, 10);
+      petal(c, fx, fy, sr * 1.2, -Math.PI * 0.5 + rr(-0.1,0.1), 0.5, 0.35,
+        hsl(fh, 65, 55 + rr(0,15)), 'rgba(40,10,60,0.3)');
+      petal(c, fx, fy + sr*0.4, sr * 0.7, Math.PI * 0.5, 0.45, 0.4,
+        hsl(fh + 15, 50, 65 + rr(0,10)), 'rgba(40,10,60,0.2)');
+    }
+  }
+}
+
+function drawLadySlipper(c, cx, cy, r) {
+  pointedPetal(c, cx, cy - r*0.15, r * 0.75, -Math.PI * 0.5 + rr(-0.1,0.1), 0.18,
+    hsl(335, 50, 65), 'rgba(80,20,50,0.4)');
+  for (let side = -1; side <= 1; side += 2) {
+    c.save(); c.translate(cx, cy);
+    const pa = side * 0.8 + rr(-0.1,0.1);
+    c.rotate(pa);
+    c.beginPath(); c.moveTo(0, 0);
+    c.bezierCurveTo(side * r*0.3, -r*0.5, side * r*0.6, -r*0.2, side * r*0.5, r*0.1);
+    c.bezierCurveTo(side * r*0.2, r*0.05, side * r*0.1, -r*0.15, 0, 0);
+    c.fillStyle = hsl(330, 45, 68); c.fill();
+    c.strokeStyle = 'rgba(80,20,50,0.35)'; c.lineWidth = 1; c.stroke();
+    c.restore();
+  }
+  const grd = c.createRadialGradient(cx, cy + r*0.15, r*0.05, cx, cy + r*0.15, r*0.4);
+  grd.addColorStop(0, '#FFD0DD'); grd.addColorStop(0.6, '#E8608A'); grd.addColorStop(1, '#C23065');
+  c.fillStyle = grd;
+  c.beginPath(); c.ellipse(cx, cy + r*0.2, r*0.3, r*0.35, 0, 0, Math.PI*2); c.fill();
+  c.strokeStyle = 'rgba(100,20,50,0.5)'; c.lineWidth = 1.2; c.stroke();
+  for (let i = 0; i < 8; i++) {
+    c.fillStyle = 'rgba(140,20,60,0.4)';
+    c.beginPath();
+    c.arc(cx + rr(-r*0.2, r*0.2), cy + r*0.15 + rr(-r*0.2, r*0.15), rr(1.5, 3), 0, Math.PI*2);
+    c.fill();
+  }
+}
+
+function drawLisianthus(c, cx, cy, r) {
+  for (let layer = 3; layer >= 0; layer--) {
+    const lr = r * (0.35 + layer * 0.18);
+    const n = 5 + layer * 2;
+    const rot = layer * 0.4;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + rot + rr(-0.15, 0.15);
+      const lHue = 335 + layer * 8 + rr(-5, 5);
+      const lLit = 68 + layer * 4 + rr(-3, 3);
+      petal(c, cx, cy, lr * rr(0.85, 1.1), a, 0.35, 0.45,
+        hsl(lHue, 55 + rr(0,20), lLit), 'rgba(100,25,55,0.3)');
+    }
+  }
+  c.fillStyle = hsl(340, 55, 50);
+  c.beginPath(); c.arc(cx, cy, r * 0.08, 0, Math.PI*2); c.fill();
+}
+
+function drawLoveInMist(c, cx, cy, r) {
+  const bracts = 14 + ri(0, 6);
+  for (let i = 0; i < bracts; i++) {
+    const a = (i / bracts) * Math.PI * 2 + rr(-0.1, 0.1);
+    const len = r * rr(0.75, 1.1);
+    const ex = cx + Math.cos(a - Math.PI/2) * len;
+    const ey = cy + Math.sin(a - Math.PI/2) * len;
+    c.strokeStyle = hsl(130 + rr(-10,10), 45, 45 + rr(0,15));
+    c.lineWidth = 0.8;
+    const mx = (cx+ex)/2 + rr(-6,6), my = (cy+ey)/2 + rr(-6,6);
+    c.beginPath(); c.moveTo(cx, cy); c.quadraticCurveTo(mx, my, ex, ey); c.stroke();
+  }
+  const sr = r * 0.4;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + rr(-0.1, 0.1);
+    const ph = [220, 320, 340, 250, 300][i] + rr(-10, 10);
+    petal(c, cx, cy, sr * rr(0.85, 1.05), a, 0.3, 0.4,
+      hsl(ph, 50 + rr(0,20), 70 + rr(0,10)), 'rgba(40,30,80,0.35)');
+  }
+  c.fillStyle = '#DDE8A0';
+  c.beginPath(); c.arc(cx, cy, sr * 0.15, 0, Math.PI*2); c.fill();
+}
+
+// ---- Dispatch table ----
+const flowerDrawers = [
+  (c,x,y,r) => drawLily(c,x,y,r,0),
+  (c,x,y,r) => drawLily(c,x,y,r,1),
+  (c,x,y,r) => drawLily(c,x,y,r,2),
+  drawLilac,
+  drawLotus,
+  drawLotus,
+  drawLantana,
+  drawLupine,
+  drawLadySlipper,
+  drawLisianthus,
+  drawLisianthus,
+  drawLoveInMist,
+  (c,x,y,r) => drawLily(c,x,y,r,3),
+  drawLisianthus,
+];
+
+// ============================================================
+//  STEMS, LEAVES & RIBBON
+// ============================================================
+
+function drawStem(c, x1, y1, x2, y2) {
+  c.strokeStyle = hsl(120 + rr(0,20), 45 + rr(0,20), 28 + rr(0,12));
+  c.lineWidth = 2.2 + rr(0, 1.8); c.lineCap = 'round';
+  const mx = (x1+x2)/2 + rr(-18, 18);
+  c.beginPath(); c.moveTo(x1,y1); c.quadraticCurveTo(mx,(y1+y2)/2,x2,y2); c.stroke();
+}
+
+function drawLeaf(c, x, y, angle, size) {
+  c.save(); c.translate(x,y); c.rotate(angle);
+  c.fillStyle = hsl(118 + rr(0,20), 50 + rr(0,20), 26 + rr(0,14));
+  c.beginPath(); c.moveTo(0,0);
+  c.bezierCurveTo(size*0.4,-size*0.5, size*0.8,-size*0.3, size,0);
+  c.bezierCurveTo(size*0.8, size*0.3, size*0.4, size*0.5, 0,0);
+  c.fill();
+  c.strokeStyle = 'rgba(20,60,10,0.4)'; c.lineWidth = 0.9;
+  c.beginPath(); c.moveTo(2,0); c.lineTo(size*0.88,0); c.stroke();
+  c.restore();
+}
+
+function drawRibbon(c, cx, cy) {
+  c.fillStyle = hsl(340 + rr(0,15), 65, 52);
+  c.beginPath(); c.ellipse(cx-13,cy,15,9,-0.3,0,Math.PI*2); c.fill();
+  c.beginPath(); c.ellipse(cx+13,cy,15,9, 0.3,0,Math.PI*2); c.fill();
+  c.fillStyle = hsl(345,70,42);
+  c.beginPath(); c.arc(cx,cy,5.5,0,Math.PI*2); c.fill();
+  c.strokeStyle = hsl(340,65,48); c.lineWidth = 3;
+  c.beginPath(); c.moveTo(cx-3,cy+3); c.quadraticCurveTo(cx-16,cy+26,cx-22,cy+42); c.stroke();
+  c.beginPath(); c.moveTo(cx+3,cy+3); c.quadraticCurveTo(cx+16,cy+26,cx+22,cy+42); c.stroke();
+}
+
+// ============================================================
+//  PAINT FULL BOUQUET TO OFFSCREEN CANVAS
+// ============================================================
+
+function paintBouquet() {
+  seedRNG(currentSeed);
+  offCtx.clearRect(0, 0, offW, offH);
+  const cx = offW / 2;
+  const tieY = offH * 0.83;
+  const midY = offH * 0.40;
+  const flowers = [];
+  const N = flowerDrawers.length;
+  for (let i = 0; i < N; i++) {
+    const t = (i / (N - 1)) - 0.5;
+    const fx = cx + t * offW * 0.40 * (1 + rr(-0.15, 0.15));
+    const fy = midY + (t * t - 0.06) * offH * 0.24 * (1 + rr(0, 0.4))
+               + rr(-offH * 0.055, offH * 0.055);
+    const baseR = Math.min(offW, offH) * 0.063;
+    flowers.push({ x: fx, y: fy, r: baseR * rr(0.7, 1.3), type: i });
+  }
+  flowers.sort((a, b) => a.y - b.y);
+  for (const f of flowers)
+    drawStem(offCtx, f.x, f.y + f.r * 0.3, cx + rr(-8, 8), tieY);
+  for (let i = 0; i < 22; i++) {
+    const sf = flowers[ri(0, flowers.length - 1)];
+    const t = rr(0.3, 0.75);
+    drawLeaf(offCtx,
+      sf.x + (cx - sf.x) * t + rr(-10, 10),
+      sf.y + (tieY - sf.y) * t,
+      rr(-1.3, 1.3), rr(14, 36));
+  }
+  drawRibbon(offCtx, cx, tieY);
+  for (const f of flowers) {
+    const g = offCtx.createRadialGradient(f.x,f.y,f.r*0.2, f.x,f.y,f.r*1.7);
+    g.addColorStop(0, 'rgba(255,110,170,0.13)');
+    g.addColorStop(1, 'rgba(255,110,170,0)');
+    offCtx.fillStyle = g;
+    offCtx.beginPath(); offCtx.arc(f.x,f.y,f.r*1.7,0,Math.PI*2); offCtx.fill();
+  }
+  for (const f of flowers)
+    flowerDrawers[f.type](offCtx, f.x, f.y, f.r);
+}
+
+// ============================================================
+//  TWINKLE STARS
+// ============================================================
+
+let stars = [];
+function genStars() {
+  stars = [];
+  const n = Math.floor((W * H) / 5500);
+  for (let i = 0; i < n; i++)
+    stars.push({ x: Math.random()*W, y: Math.random()*H,
+      ph: Math.random()*Math.PI*2, sp: 1.4+Math.random()*3,
+      ch: '.+*'[Math.floor(Math.random()*3)] });
+}
+
+// ============================================================
+//  MAIN RENDER LOOP
+// ============================================================
+
+let frame = 0;
+
+function render() {
+  frame++;
+  const t = frame * 0.016;
+  const cw = cellW(), ch = cellH();
+
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  const imgData = offCtx.getImageData(0, 0, offW, offH);
+  const px = imgData.data;
+  const cols = Math.floor(W / cw);
+  const rows = Math.floor(H / ch);
+  const sx = offW / (cols * cw);
+  const sy = offH / (rows * ch);
+
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${ch}px "Courier New", monospace`;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const ox = Math.floor((col * cw + cw / 2) * sx);
+      const oy = Math.floor((row * ch + ch / 2) * sy);
+      if (ox >= offW || oy >= offH) continue;
+      const idx = (oy * offW + ox) * 4;
+      let r = px[idx], g = px[idx+1], b = px[idx+2], a = px[idx+3];
+      if (a < 5) continue;
+
+      let br = (0.299*r + 0.587*g + 0.114*b) / 255 * (a / 255);
+      br = Math.max(0, Math.min(1, br + 0.06 * Math.sin(t*1.2 + col*0.6 + row*0.4)));
+      const ci = Math.floor(br * (CHAR_RAMP.length - 1));
+      if (ci <= 0) continue;
+
+      const max = Math.max(r,g,b), min = Math.min(r,g,b);
+      if (max > 0 && max !== min) {
+        const mid = (max + min) / 2;
+        const boost = 1.25;
+        r = Math.min(255, mid + (r - mid) * boost);
+        g = Math.min(255, mid + (g - mid) * boost);
+        b = Math.min(255, mid + (b - mid) * boost);
+      }
+
+      ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${(a/255).toFixed(2)})`;
+      ctx.fillText(CHAR_RAMP[ci], col * cw, row * ch);
+    }
+  }
+
+  ctx.font = `${ch - 2}px "Courier New", monospace`;
+  for (const s of stars) {
+    const tw = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t * s.sp + s.ph));
+    ctx.fillStyle = `rgba(255,255,255,${(tw * 0.45).toFixed(2)})`;
+    ctx.fillText(s.ch, s.x, s.y);
+  }
+
+  ctx.fillStyle = 'rgba(0,0,0,0.09)';
+  for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+
+  requestAnimationFrame(render);
+}
+
+// ============================================================
+//  RESIZE & CONTROLS
+// ============================================================
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  vis.width = W; vis.height = H;
+  offW = Math.min(W, 840);
+  offH = Math.round(offW * (H / W));
+  offC.width = offW; offC.height = offH;
+  paintBouquet(); genStars();
+}
+
+window.addEventListener('resize', resize);
+
+// ============================================================
+//  INTERACTIVE QUIZ SYSTEM
+// ============================================================
+
+const FAVORITE_FLOWER = 'Lotus';  // ← the correct answer
+const FLOWER_CHOICES = [
+  'Lily', 'Lilac', 'Lotus', 'Lantana',
+  'Lupine', "Lady's Slipper", 'Lisianthus', 'Love-in-the-Mist'
+];
+
+const quizOverlay   = document.getElementById('quiz-overlay');
+const quizContent   = document.getElementById('quiz-content');
+const wrongPanel    = document.getElementById('wrong-panel');
+const flowerGrid    = document.getElementById('flower-grid');
+const flowerInput   = document.getElementById('flower-input');
+const submitBtn     = document.getElementById('submit-btn');
+const fwCanvas      = document.getElementById('fireworks-canvas');
+const fwCtx         = fwCanvas.getContext('2d');
+const fwMsg         = document.getElementById('fireworks-msg');
+const titleEl       = document.getElementById('title');
+const hintEl        = document.getElementById('hint');
+
+let quizShown = false;
+let quizDone  = false;
+
+// Build flower buttons
+FLOWER_CHOICES.forEach(name => {
+  const btn = document.createElement('button');
+  btn.className = 'flower-btn';
+  btn.textContent = name;
+  btn.addEventListener('click', () => handleGuess(btn, name));
+  flowerGrid.appendChild(btn);
+});
+
+// Show quiz on first click (instead of regenerating)
+function showQuiz() {
+  if (quizShown || quizDone) return;
+  quizShown = true;
+  quizOverlay.classList.add('show');
+  titleEl.style.opacity = '0';
+  hintEl.style.opacity = '0';
+}
+
+// Replace the old click-to-regenerate
+window.addEventListener('click', (e) => {
+  if (!quizShown && !quizDone) {
+    e.stopPropagation();
+    showQuiz();
+  }
+}, true);
+
+// Keep R key to regenerate the bouquet behind the quiz
+window.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') {
+    currentSeed = Date.now() ^ (Math.random() * 0xFFFFFF >>> 0);
+    paintBouquet(); genStars();
+  }
+});
+
+function handleGuess(btn, name) {
+  if (quizDone) return;
+
+  if (name === FAVORITE_FLOWER) {
+    // CORRECT!
+    btn.classList.add('correct');
+    quizDone = true;
+    setTimeout(() => {
+      quizOverlay.classList.remove('show');
+      launchFireworks('You got it! 🌸✨');
+    }, 800);
+  } else {
+    // WRONG — shake the button, then show text input
+    btn.classList.add('wrong');
+    setTimeout(() => btn.classList.remove('wrong'), 600);
+
+    // After a brief delay, switch to the text input panel
+    setTimeout(() => {
+      quizContent.style.display = 'none';
+      wrongPanel.classList.add('show');
+      flowerInput.focus();
+    }, 700);
+  }
+}
+
+// Handle text submission
+submitBtn.addEventListener('click', submitFlowerText);
+flowerInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitFlowerText();
+});
+
+function submitFlowerText() {
+  const val = flowerInput.value.trim();
+  if (!val) {
+    flowerInput.style.borderColor = 'rgba(255,100,100,0.7)';
+    setTimeout(() => flowerInput.style.borderColor = '', 600);
+    return;
+  }
+  quizDone = true;
+  quizOverlay.classList.remove('show');
+  launchFireworks(`${val} — beautiful choice 💐✨`);
+}
+
+// ============================================================
+//  FIREWORKS ENGINE
+// ============================================================
+
+let fwParticles = [];
+let fwActive = false;
+let fwStartTime = 0;
+const FW_DURATION = 12000; // 12 seconds of fireworks
+let fwLaunchQueue = [];
+
+function launchFireworks(message) {
+  fwCanvas.width = window.innerWidth;
+  fwCanvas.height = window.innerHeight;
+  fwCanvas.classList.add('show');
+  fwMsg.textContent = message;
+  fwActive = true;
+  fwStartTime = performance.now();
+  fwParticles = [];
+  fwLaunchQueue = [];
+
+  // Schedule multiple firework bursts
+  const burstCount = 18;
+  for (let i = 0; i < burstCount; i++) {
+    fwLaunchQueue.push({
+      time: i * (FW_DURATION / burstCount) + Math.random() * 400,
+      x: fwCanvas.width * (0.1 + Math.random() * 0.8),
+      y: fwCanvas.height * (0.15 + Math.random() * 0.5),
+    });
+  }
+
+  // Show message after first burst
+  setTimeout(() => fwMsg.classList.add('show'), 600);
+
+  // End fireworks
+  setTimeout(() => {
+    fwActive = false;
+    fwCanvas.classList.remove('show');
+    fwMsg.classList.remove('show');
+    titleEl.textContent = message.replace(/[💐✨🌸]/g, '').trim();
+    titleEl.style.opacity = '1';
+    hintEl.textContent = 'Press R to regenerate the bouquet';
+    hintEl.style.opacity = '1';
+  }, FW_DURATION + 2000);
+
+  requestAnimationFrame(renderFireworks);
+}
+
+// Firework particle colors — bright, festive
+const FW_PALETTES = [
+  // Pink/Rose
+  ['#FF69B4','#FF1493','#FFB6C1','#FF85A2','#FFC0CB'],
+  // Gold/Warm
+  ['#FFD700','#FFA500','#FF8C00','#FFE066','#FFCC33'],
+  // Lavender/Purple
+  ['#DA70D6','#BA55D3','#EE82EE','#D8BFD8','#9370DB'],
+  // Mint/Teal
+  ['#7FFFD4','#40E0D0','#00CED1','#66FFCC','#20B2AA'],
+  // White/Silver
+  ['#FFFFFF','#F0F0FF','#E8E8F0','#DCDCF0','#C0C0D0'],
+  // Red/Crimson
+  ['#FF4444','#FF6666','#FF2222','#CC3333','#FF8888'],
+];
+
+function createBurst(x, y) {
+  const palette = FW_PALETTES[Math.floor(Math.random() * FW_PALETTES.length)];
+  const count = 60 + Math.floor(Math.random() * 50);
+  const baseSpeed = 2 + Math.random() * 4;
+
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+    const speed = baseSpeed * (0.4 + Math.random() * 0.8);
+    const color = palette[Math.floor(Math.random() * palette.length)];
+
+    fwParticles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.0,
+      decay: 0.008 + Math.random() * 0.012,
+      color,
+      size: 1.5 + Math.random() * 2.5,
+      gravity: 0.03 + Math.random() * 0.02,
+      trail: [],
+      sparkle: Math.random() > 0.6,
+    });
+  }
+
+  // Inner ring of bright sparkles
+  const sparkleCount = 15 + Math.floor(Math.random() * 10);
+  for (let i = 0; i < sparkleCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = baseSpeed * (0.15 + Math.random() * 0.3);
+    fwParticles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.0,
+      decay: 0.015 + Math.random() * 0.01,
+      color: '#FFFFFF',
+      size: 1 + Math.random() * 1.5,
+      gravity: 0.02,
+      trail: [],
+      sparkle: true,
+    });
+  }
+}
+
+function renderFireworks(now) {
+  if (!fwActive) return;
+
+  const elapsed = now - fwStartTime;
+
+  // Check launch queue
+  for (let i = fwLaunchQueue.length - 1; i >= 0; i--) {
+    if (elapsed >= fwLaunchQueue[i].time) {
+      createBurst(fwLaunchQueue[i].x, fwLaunchQueue[i].y);
+      fwLaunchQueue.splice(i, 1);
+    }
+  }
+
+  // Semi-transparent clear for trail effect
+  fwCtx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  fwCtx.fillRect(0, 0, fwCanvas.width, fwCanvas.height);
+
+  // Update and draw particles
+  for (let i = fwParticles.length - 1; i >= 0; i--) {
+    const p = fwParticles[i];
+
+    // Store trail
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 6) p.trail.shift();
+
+    // Physics
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += p.gravity;
+    p.vx *= 0.99;
+    p.life -= p.decay;
+
+    if (p.life <= 0) {
+      fwParticles.splice(i, 1);
+      continue;
+    }
+
+    // Draw trail
+    if (p.trail.length > 1) {
+      fwCtx.beginPath();
+      fwCtx.moveTo(p.trail[0].x, p.trail[0].y);
+      for (let j = 1; j < p.trail.length; j++) {
+        fwCtx.lineTo(p.trail[j].x, p.trail[j].y);
+      }
+      fwCtx.strokeStyle = p.color;
+      fwCtx.globalAlpha = p.life * 0.3;
+      fwCtx.lineWidth = p.size * 0.5;
+      fwCtx.stroke();
+    }
+
+    // Draw particle
+    fwCtx.globalAlpha = p.life;
+    fwCtx.fillStyle = p.color;
+    fwCtx.beginPath();
+    fwCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    fwCtx.fill();
+
+    // Sparkle flash
+    if (p.sparkle && Math.random() > 0.5) {
+      fwCtx.globalAlpha = p.life * 0.8;
+      fwCtx.fillStyle = '#FFF';
+      fwCtx.beginPath();
+      fwCtx.arc(p.x, p.y, p.size * 0.5 * p.life, 0, Math.PI * 2);
+      fwCtx.fill();
+    }
+
+    // Glow
+    fwCtx.globalAlpha = p.life * 0.15;
+    fwCtx.fillStyle = p.color;
+    fwCtx.beginPath();
+    fwCtx.arc(p.x, p.y, p.size * 4 * p.life, 0, Math.PI * 2);
+    fwCtx.fill();
+  }
+
+  fwCtx.globalAlpha = 1;
+
+  requestAnimationFrame(renderFireworks);
+}
+
+// Handle fireworks canvas resize
+window.addEventListener('resize', () => {
+  if (fwActive) {
+    fwCanvas.width = window.innerWidth;
+    fwCanvas.height = window.innerHeight;
+  }
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+
+resize();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
